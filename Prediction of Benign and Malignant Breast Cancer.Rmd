@@ -1,0 +1,629 @@
+---
+title: "Prediction of Benign and Malignant Breast Cancer"
+author: "Harika Panuganty"
+date: "4/3/2021"
+output: html_document
+---
+
+Introduction
+This dataset is publicly available on Kaggle (https://www.kaggle.com/uciml/breast-cancer-wisconsin-data) and looks at the physical features of a breast mass from digitized images from a file needle aspirate biopsy. 
+
+Breast cancer is the second leading cause of cancer death in women, with over 250,000 affected in 2018. Misdiagnoses of benign and malignant tumors can be detrimental towards treatment efforts as treatment options differ greatly between the two. This dataset consists of biopsies from breast cancer patients in Wisconsin and the database is UCI's Machine Learning Repository. 
+
+The goal of this project is to determine whether a breast mass tumor is malignant or benign based on several different physical factors. 
+
+Classes and Variables 
+This dataset consists of 3 classes:
+- means, standard error (SE) and worst (i.e., mean of three largest values in each variable) 
+and 32 variables:
+1. Radius: Distance from center to points on perimeter
+2. Texture: Standard deviation of gray-scale values 
+3. Perimeter: Size of core tumor 
+4. Area: Area of tumor
+5. Smoothness: Local variation in radius lengths 
+6. Compactness: [(Mean of perimeter)^2/area] - 1.0 
+7. Concavity: Depth of concave portions of contours in tumor
+8. Concave.points: No. of concave portions of the contour
+9. Symmetry: Tumor symmetry
+10. Fractal Dimension: Pattern changes depending on scale measured in
+
+Project Methodology:
+In addition to predicting the classification of breast tumor, we wanted to find the most effective variable in determining malignancy or benignity of the tumor. This is how we did it: 
+- Utilized two predictive modelling techniques: logistic regression (baseline) and neural networks
+We settled on 4 logistic regression models and 4 neural networks testing the different classes: All variables, Mean Variables, Worst variables + SE variables 
+
+Our model parameters were: 
+Logistic Regression
+Train-test split: 70:30
+Neural Networks
+Number = 3; 3 resampling iterations 
+Grid size 2-50 with 1 layer in between
+Decay rate = 5e-4 
+
+Below chunk of code consists of: Data cleaning, doing 70-30 split, running logistic regression against ALL variables (mean + se + worst) and performing prediction on test dataset 
+```{r}
+rm(list=ls())
+library(plyr) 
+library(dplyr) 
+library(pROC)
+library(caret)
+library(nnet)
+library(ggplot2)
+library(randomForest)
+
+bcdata <- read.csv("~/Desktop/data.csv", header = TRUE)
+
+#data cleaning
+bc_data <- within(bcdata, rm(X)) #removed random X column in dataset
+#summary(bc_data)
+
+#as.factor diagnosis to determine if its a binary variable
+bc_data$diagnosis <- as.factor(bc_data$diagnosis)
+
+#we need as.factor to create as.integer
+bc_data$diagnosis <- as.integer(bc_data$diagnosis == "M")
+
+#as.factor to change the binary variable
+bc_data$diagnosis <- as.factor(bc_data$diagnosis)
+#summary(bc_data)
+
+set.seed(345)
+#to create a 70-30 split
+bc_data_split <- createDataPartition(bc_data$diagnosis, p=.7, list = FALSE, times=1)
+
+head(bc_data_split) #to double check
+
+#Split data into test and train
+bc_data.train <- bc_data[bc_data_split,]
+bc_data.test <- bc_data[-bc_data_split,]
+
+#Logistic regression on train dataset against all variables
+bc_data.train.log <- glm(diagnosis~., data=bc_data.train, family="binomial")
+
+#Perform prediction on test dataset
+bc_data.test$pred_diagnosis <- predict.glm(bc_data.train.log, newdata = bc_data.test, type="response")
+
+#First create a prediction object
+pred <- roc(response = bc_data.test$diagnosis, predictor = bc_data.test$pred_diagnosis, direction = "<")
+
+#Get AUC performance = 0.936953 
+auc_perf <- auc(pred)
+cat("AUC: ", auc_perf, "\n")
+
+#AUC 95% CI = 0.8977693 0.936953 0.9761367 
+ci_auc_perf <- ci.auc(pred)
+cat("95% CI: ", ci_auc_perf, "\n")
+
+```
+
+
+Below chunk of code consists of: Logistic regression on ALL MEAN variables and performing test prediction on dataset 
+```{r}
+#Using dataset with all means
+#Logistic regression on train dataset against mean variables
+
+bc_data.train.log.mean <- glm(diagnosis~ radius_mean+texture_mean+ perimeter_mean+area_mean+smoothness_mean+compactness_mean+concavity_mean+ concave.points_mean+symmetry_mean+fractal_dimension_mean, data=bc_data.train, family="binomial")
+
+#Perform prediction on test dataset
+bc_data.test$pred_diagnosis.mean <- predict.glm(bc_data.train.log.mean, newdata = bc_data.test, type="response")
+
+#First create a prediction object
+pred.mean <- roc(response = bc_data.test$diagnosis, predictor = bc_data.test$pred_diagnosis.mean, direction = "<")
+
+#Get AUC performance 
+auc_perf.mean <- auc(pred.mean)
+cat("AUC: ", auc_perf.mean, "\n")
+
+#AUC 95% CI  
+ci_auc_perf.mean <- ci.auc(pred.mean)
+cat("95% CI: ", ci_auc_perf.mean, "\n")
+
+```
+
+Below chunk of code consists of: Logistic regression on ALL WORST variables and performing test prediction on dataset 
+```{r}
+#Using dataset with all worst
+#Logistic regression on train dataset against worst variables
+
+bc_data.train.log.worst <- glm(diagnosis~ radius_worst+texture_worst+ perimeter_worst+area_worst+smoothness_worst+compactness_worst+concavity_worst+ concave.points_worst+symmetry_worst+fractal_dimension_worst, data=bc_data.train, family="binomial")
+
+#Perform prediction on test dataset
+bc_data.test$pred_diagnosis.worst <- predict.glm(bc_data.train.log.worst, newdata = bc_data.test, type="response")
+
+#First create a prediction object
+pred.worst <- roc(response = bc_data.test$diagnosis, predictor = bc_data.test$pred_diagnosis.worst, direction = "<")
+
+#Get AUC performance 
+auc_perf.worst <- auc(pred.worst)
+cat("AUC: ", auc_perf.worst, "\n")
+
+#AUC 95% CI 
+ci_auc_perf.worst <- ci.auc(pred.worst)
+cat("95% CI: ", ci_auc_perf.worst, "\n")
+```
+
+
+Below chunk of code consists of: Logistic regression on ALL MEAN + SE variables and performing test prediction on dataset 
+```{r}
+#Using dataset with means + se 
+#Logistic regression on train dataset against mean + se variables
+bc_data.train.log.mean.se <- glm(diagnosis~ radius_mean+texture_mean+ perimeter_mean+area_mean+smoothness_mean+compactness_mean+concavity_mean+ concave.points_mean+symmetry_mean+fractal_dimension_mean+radius_se+texture_se+ perimeter_se+area_se+smoothness_se+compactness_se+concavity_se+ concave.points_se+symmetry_se+fractal_dimension_se, data=bc_data.train, family="binomial")
+
+#Perform prediction on test dataset
+bc_data.test$pred_diagnosis.mean.se <- predict.glm(bc_data.train.log.mean.se, newdata = bc_data.test, type="response")
+
+#First create a prediction object
+pred.mean.se <- roc(response = bc_data.test$diagnosis, predictor = bc_data.test$pred_diagnosis.mean.se, direction = "<")
+
+#Get AUC performance 
+auc_perf.mean.se <- auc(pred.mean.se)
+cat("AUC: ", auc_perf.mean.se, "\n")
+
+#AUC 95% CI  
+ci_auc_perf.mean.se <- ci.auc(pred.mean.se)
+cat("95% CI: ", ci_auc_perf.mean.se, "\n")
+```
+
+
+Below chunk of code consists of: Creating forestplot for logistic regression 
+The AUC's and 95% CI for each of the classes are very narrow and it is difficult to identify the best AUC value and the tightest 95% CI, so below is a forest plot to clearly show and compare between the classes. 
+Taking a look at this plot, we can note that class All mean + SE has the best AUC and a tight 95% CI therefore being the best logistic regression model out of the 4. 
+
+```{r}
+library(ggplot2)
+forest.plot <- read.csv("~/Desktop/forestplot.csv", header = TRUE)
+
+# reverses the factor level ordering for labels after coord_flip()
+#df$label <- factor(df$label, levels=rev(df$label))
+
+
+fp.log <- ggplot(data=forest.plot, aes(x=Logistic.AUC, y=AUC, ymin=AUC_left, ymax=AUC_right)) +
+        geom_pointrange() + 
+        geom_hline(yintercept=1, lty=2) + 
+        coord_flip() +  # flip coordinates (puts labels on y axis)
+        xlab("Variables") + ylab("AUC") +
+        theme_bw(base_size = 16) + ggtitle("Logistic Regression AUC's") + geom_point(shape=21, fill="salmon", color = "black", size=4) 
+print(fp.log)
+
+ggsave("fp.log.jpeg")
+```
+
+
+Below chunk of code consists of: Neural Network for ALL variables 
+```{r}
+library(nnet)
+
+# Changing the response into a format recognized by caret
+bc_data.train$diagnosis_cat <- ifelse(bc_data.train$diagnosis == 1, "Yes", "No") 
+
+bc_data.test$diagnosis_cat <- ifelse(bc_data.test$diagnosis == 1, "Yes", "No") 
+
+#Set training parameters
+fit_control <- trainControl(method = "cv", number = 3, classProbs = TRUE, summaryFunction = twoClassSummary)
+#trainControl= control the computational nuances of the train function
+#Method- resampling method "cv"- for repeated training/test splits
+#number- either the number of folds or number of resampling iterations
+#classProbs- a logical; should class probabilities be computed for classification models in each resample?
+#summaryFunction- function to compute performance metrics across resamples. twoClassSummary- metric that relies on class probabilities
+
+#set a grid of parameters to train over
+nnet_params <- expand.grid(size = seq(from = 2, to = 50, by = 1), decay = 5e-4)
+#expand.grid- create a data fram from all combinations of supplied vectors, size = seq is the size of the grid
+
+#Create model on training data 
+bc_data.model <- train(diagnosis_cat ~ radius_mean+texture_mean+perimeter_mean+area_mean+smoothness_mean+compactness_mean+ concavity_mean+concave.points_mean+symmetry_mean+fractal_dimension_mean+radius_se+texture_se+perimeter_se+area_se+smoothness_se+compactness_se+ concavity_se+concave.points_se+symmetry_se+fractal_dimension_se+radius_worst+texture_worst+perimeter_worst+area_worst+smoothness_worst+compactness_worst+concavity_worst+concave.points_worst+symmetry_worst+fractal_dimension_worst, data = bc_data.train, method = "nnet", metric = "ROC", trControl = fit_control, tuneGrid = nnet_params, trace = FALSE)
+
+#Predition using ANNs
+
+# To predict
+bc_data.predict <- predict(bc_data.model, newdata = bc_data.test, type = "prob") 
+
+
+bc_data.test$predict_diagnosis <- bc_data.predict$Yes
+
+pred_roc.n <- roc(response=bc_data.test$diagnosis_cat,predictor = bc_data.test$predict_diagnosis, direction= "<")
+
+
+# Get AUC performance
+AUC.n <- auc(pred_roc.n) 
+cat("AUC: ", AUC.n, "\n")
+
+# Get 95% CI
+CI_AUC.n <- ci.auc(pred_roc.n) 
+cat("95% CI: ", CI_AUC.n, "\n")
+```
+
+Below chunk of code consists of: Neural Network for all MEANS
+```{r}
+#Create model on training data 
+bc_data.model.m <- train(diagnosis_cat ~ radius_mean+texture_mean+perimeter_mean+area_mean+smoothness_mean+compactness_mean+ concavity_mean+concave.points_mean+symmetry_mean+fractal_dimension_mean, data = bc_data.train, method = "nnet", metric = "ROC", trControl = fit_control, tuneGrid = nnet_params, trace = FALSE)
+
+#Prediction using ANNs
+
+# To predict
+bc_data.predict.m <- predict(bc_data.model.m, newdata = bc_data.test, type = "prob") 
+
+
+bc_data.test$predict_diagnosis.m <- bc_data.predict.m$Yes
+
+pred_roc.n.m <- roc(response=bc_data.test$diagnosis_cat, predictor = bc_data.test$predict_diagnosis.m, direction= "<")
+
+
+# Get AUC performance
+AUC.n.m <- auc(pred_roc.n.m) 
+cat("AUC: ", AUC.n.m, "\n")
+
+# Get 95% CI
+CI_AUC.n.m <- ci.auc(pred_roc.n.m) 
+cat("95% CI: ", CI_AUC.n.m, "\n")
+```
+
+Below chunk of code consists of: Neural Network for all WORST
+```{r}
+#Create model on training data 
+bc_data.model.w <- train(diagnosis_cat ~ radius_worst+texture_worst+perimeter_worst+area_worst+smoothness_worst+compactness_worst+concavity_worst+concave.points_worst+symmetry_worst+fractal_dimension_worst, data = bc_data.train, method = "nnet", metric = "ROC", trControl = fit_control, tuneGrid = nnet_params, trace = FALSE)
+
+
+#Predition using ANNs
+
+# To predict
+bc_data.predict.w <- predict(bc_data.model.w, newdata = bc_data.test, type = "prob") 
+
+
+bc_data.test$predict_diagnosis.w <- bc_data.predict.w$Yes
+
+pred_roc.n.w <- roc(response=bc_data.test$diagnosis_cat, predictor = bc_data.test$predict_diagnosis.w, direction= "<")
+
+
+# Get AUC performance
+AUC.n.w <- auc(pred_roc.n.w) 
+cat("AUC: ", AUC.n.w, "\n")
+
+# Get 95% CI
+CI_AUC.n.w <- ci.auc(pred_roc.n.w) 
+cat("95% CI: ", CI_AUC.n.w, "\n")
+```
+
+Below chunk of code consists of: Neural Network for MEANS + SE 
+```{r}
+#Create model on training data 
+bc_data.model.n.se.m <- train(diagnosis_cat ~ radius_mean+texture_mean+perimeter_mean+area_mean+smoothness_mean+compactness_mean+ concavity_mean+concave.points_mean+symmetry_mean+fractal_dimension_mean+radius_se+texture_se+perimeter_se+area_se+smoothness_se+compactness_se+ concavity_se+concave.points_se+symmetry_se+fractal_dimension_se, data = bc_data.train, method = "nnet", metric = "ROC", trControl = fit_control, tuneGrid = nnet_params, trace = FALSE)
+
+
+#Predition using ANNs
+
+# To predict
+bc_data.predict.n.se.m <- predict(bc_data.model.n.se.m, newdata = bc_data.test, type = "prob") 
+
+
+bc_data.test$predict_diagnosis.n.se.m <- bc_data.predict.n.se.m$Yes
+
+pred_roc.n.se.m <- roc(response=bc_data.test$diagnosis_cat, predictor = bc_data.test$predict_diagnosis.n.se.m, direction= "<")
+
+
+# Get AUC performance
+AUC.n.se.m <- auc(pred_roc.n.se.m) 
+cat("AUC: ", AUC.n.se.m, "\n")
+
+# Get 95% CI
+CI_AUC.n.se.m <- ci.auc(pred_roc.n.se.m) 
+cat("95% CI: ", CI_AUC.n.se.m, "\n")
+```
+
+Below chunk of code consists of: Creating forestplot for Neural Networks
+The AUC's and 95% CI for each of the classes are very narrow and it is difficult to identify the best AUC value and the tightest 95% CI, so below is a forest plot to clearly show and compare between the classes. 
+Taking a look at this plot, we can note that class All has the best AUC and a tight 95% CI therefore being the best neural network model out of the 4. 
+```{r}
+library(ggplot2)
+forest.plot.nn <- read.csv("~/Desktop/forestplot.nn.csv", header = TRUE)
+
+# reverses the factor level ordering for labels after coord_flip()
+#df$label <- factor(df$label, levels=rev(df$label))
+
+fp.nn <- ggplot(data=forest.plot.nn, aes(x=NN.AUC, y=AUC, ymin=AUC_left, ymax=AUC_right)) +
+        geom_pointrange() + 
+        geom_hline(yintercept=1, lty=2) + expand_limits(y=0.9) +
+        coord_flip() +  # flip coordinates (puts labels on y axis)
+        xlab("Variables") + ylab("AUC") +
+        theme_bw() + ggtitle("Neural Networks AUC's") + geom_point(shape=21, fill="turquoise", color = "black", size=4) 
+print(fp.nn)
+
+```
+
+Below chunk of code consists of: Variable Importance Plot for ALL Neural Networks (the best model)
+Comparing the values and the plots, we've confirmed that the best model (between logistic regression and neural networks) is All neural networks. Going one step further, we wanted to see which variable within this All neural network model would best determine the benign/malignant outcome of the tumor. To determine this, we created a variable importance plot as shown below.
+
+As we observe, area_se, radius_worst and perimeter_mean are the most effective variables, greatest to least, respectively. 
+```{r}
+library(randomForest)
+library(ggplot2)
+library(nnet)
+
+this_mtry = floor(sqrt(ncol(bc_data.train))) 
+grid_params <- expand.grid(.mtry=this_mtry)
+
+train_control_params <- trainControl(method = "cv", number = 3, classProbs = TRUE, summaryFunction = twoClassSummary)
+
+set.seed(345)
+m.RF <- train(diagnosis_cat ~ radius_mean+texture_mean+perimeter_mean+area_mean+smoothness_mean+compactness_mean+ concavity_mean+concave.points_mean+symmetry_mean+fractal_dimension_mean+radius_se+texture_se+perimeter_se+area_se+smoothness_se+compactness_se+ concavity_se+concave.points_se+symmetry_se+fractal_dimension_se+radius_worst+texture_worst+perimeter_worst+area_worst+smoothness_worst+compactness_worst+concavity_worst+concave.points_worst+symmetry_worst+fractal_dimension_worst, data=bc_data.train,
+         method = "rf",
+         metric= "ROC",
+         tunegrid = grid_params,
+         ntree = 10,
+         trControl = train_control_params)
+
+variable.imp <- varImp(bc_data.model)
+plot(variable.imp)
+```
+
+Below chunk of code consists of: Combining ForestPlot for both Logistic Regression and Neural Networks
+The forestplot here shows both individual forest plots and we can clearly see the All Neural Network has the highest AUC and the tightest 95%CI out of all the logistic regression and neural network models, therefore being the best at predicting malignancy/benignity of breast cancer tumors.  
+
+```{r}
+library(ggplot2)
+
+forest.plot.both <- read.csv("~/Desktop/AUC.both.csv", header = TRUE)
+
+fp.both <- ggplot(data=forest.plot.both, aes(x=AUC.both, y=AUC, ymin=AUC_Left, ymax=AUC_Right)) +
+        geom_pointrange() + 
+        geom_hline(yintercept=1, lty=2) + 
+        coord_flip() +  # flip coordinates (puts labels on y axis)
+        xlab("Variables") + ylab("AUC") +
+        theme_bw() + ggtitle("Logistic Regression and Neural Network AUC's") + geom_point(aes(fill=Type), colour="black",shape=21, size=4)
+
+print(fp.both)
+ggsave("fp.both.jpeg")
+```
+
+Table 1 Data
+The P-value is very large and therefore not significant for fractal_dimension of the means. Additionally, the area_SD for the means class and worst class was very large and not tight like the other variables 
+```{r}
+
+malignant <- filter(bc_data, diagnosis== 1)
+benign <- filter(bc_data, diagnosis== 0)
+
+#Radius_means 
+cat("Mean radius_mean for benign", mean(benign$radius_mean), "\n")
+
+cat("Std for radius_mean for benign", sd(benign$radius_mean), "\n")
+
+cat("Mean radius_mean for malignant", mean(malignant$radius_mean), "\n")
+
+cat("Std for radius_mean for malignant", sd(malignant$radius_mean), "\n")
+
+radius_mean.test <- t.test(benign$radius_mean, malignant$radius_mean) 
+radius_mean.test
+
+#Texture_means
+cat("Mean texture_mean for Benign", mean(benign$texture_mean), "\n")
+
+cat("Std for texture_mean Benign", sd(benign$texture_mean), "\n")
+
+cat("Mean texture_mean for Malignant", mean(malignant$texture_mean), "\n")
+
+cat("Std for texture_mean Malignant", sd(malignant$texture_mean), "\n")
+
+texture_mean.test <- t.test(benign$texture_mean, malignant$texture_mean) 
+texture_mean.test
+
+#Perimeter_mean
+cat("Mean perimeter_mean for Benign", mean(benign$perimeter_mean), "\n")
+
+cat("Std for perimeter_mean Benign", sd(benign$perimeter_mean), "\n")
+
+cat("Mean perimeter_mean for Malignant", mean(malignant$perimeter_mean), "\n")
+
+cat("Std for perimeter_mean Malignant", sd(malignant$perimeter_mean), "\n")
+
+perimeter_mean.test <- t.test(benign$perimeter_mean, malignant$perimeter_mean) 
+perimeter_mean.test
+
+#Area_mean
+cat("Mean area_mean for Benign", mean(benign$area_mean), "\n")
+
+cat("Std for area_mean Benign", sd(benign$area_mean), "\n")
+
+cat("Mean area_mean for Malignant", mean(malignant$area_mean), "\n")
+
+cat("Std for area_mean Malignant", sd(malignant$area_mean), "\n")
+
+area_mean.test <- t.test(benign$area_mean, malignant$area_mean) 
+area_mean.test
+
+#Smoothness_mean 
+cat("Mean smoothness_mean for Benign", mean(benign$smoothness_mean), "\n")
+
+cat("Std for smoothness_mean Benign", sd(benign$smoothness_mean), "\n")
+
+cat("Mean smoothness_mean for Malignant", mean(malignant$smoothness_mean), "\n")
+
+cat("Std for smoothness_mean Malignant", sd(malignant$smoothness_mean), "\n")
+
+smoothness_mean.test <- t.test(benign$smoothness_mean, malignant$smoothness_mean) 
+smoothness_mean.test
+
+#Compactness_mean
+cat("Mean compactness_mean for Benign", mean(benign$compactness_mean), "\n")
+
+cat("Std for compactness_mean Benign", sd(benign$compactness_mean), "\n")
+
+cat("Mean compactness_mean for Malignant", mean(malignant$compactness_mean), "\n")
+
+cat("Std for compactness_mean Malignant", sd(malignant$compactness_mean), "\n")
+
+compactness_mean.test <- t.test(benign$compactness_mean, malignant$compactness_mean) 
+compactness_mean.test
+
+#Concavity_mean
+cat("Mean concavity_mean for Benign", mean(benign$concavity_mean), "\n")
+
+cat("Std for concavity_mean Benign", sd(benign$concavity_mean), "\n")
+
+cat("Mean concavity_mean for Malignant", mean(malignant$concavity_mean), "\n")
+
+cat("Std for concavity_mean Malignant", sd(malignant$concavity_mean), "\n")
+
+concavity_mean.test <- t.test(benign$concavity_mean, malignant$concavity_mean) 
+concavity_mean.test
+
+#Concave.points_mean
+cat("Mean concave.points_mean for Benign", mean(benign$concave.points_mean), "\n")
+
+cat("Std for concave.points_mean Benign", sd(benign$concave.points_mean), "\n")
+
+cat("Mean concave.points_mean for Malignant", mean(malignant$concave.points_mean), "\n")
+
+cat("Std for concave.points_mean Malignant", sd(malignant$concave.points_mean), "\n")
+
+concave.points_mean.test <- t.test(benign$concave.points_mean, malignant$concave.points_mean) 
+concave.points_mean.test
+
+#Symmetry_mean
+cat("Mean symmetry_mean for Benign", mean(benign$symmetry_mean), "\n")
+
+cat("Std for symmetry_mean Benign", sd(benign$symmetry_mean), "\n")
+
+cat("Mean symmetry_mean for Malignant", mean(malignant$symmetry_mean), "\n")
+
+cat("Std for symmetry_mean Malignant", sd(malignant$symmetry_mean), "\n")
+
+symmetry_mean.test <- t.test(benign$symmetry_mean, malignant$symmetry_mean) 
+symmetry_mean.test
+
+#Fractal_dimension_mean
+cat("Mean fractal_dimension_mean for Benign", mean(benign$fractal_dimension_mean), "\n")
+
+cat("Std for fractal_dimension_mean Benign", sd(benign$fractal_dimension_mean), "\n")
+
+cat("Mean fractal_dimension_mean for Malignant", mean(malignant$fractal_dimension_mean), "\n")
+
+cat("Std for fractal_dimension_mean Malignant", sd(malignant$fractal_dimension_mean), "\n")
+
+fractal_dimension_mean.test <- t.test(benign$fractal_dimension_mean, malignant$fractal_dimension_mean) 
+fractal_dimension_mean.test
+
+#Radius_worst  
+cat("Mean radius_worst for benign", mean(benign$radius_worst), "\n")
+
+cat("Std for radius_worst for benign", sd(benign$radius_worst), "\n")
+
+cat("Mean radius_worst for malignant", mean(malignant$radius_worst), "\n")
+
+cat("Std for radius_worst for malignant", sd(malignant$radius_worst), "\n")
+
+radius_worst.test <- t.test(benign$radius_worst, malignant$radius_worst) 
+radius_worst.test
+
+#Texture_worst 
+cat("Mean texture_worst for benign", mean(benign$texture_worst), "\n")
+
+cat("Std for texture_worst for benign", sd(benign$texture_worst), "\n")
+
+cat("Mean texture_worst for malignant", mean(malignant$texture_worst), "\n")
+
+cat("Std for texture_worst for malignant", sd(malignant$texture_worst), "\n")
+
+texture_worst.test <- t.test(benign$texture_worst, malignant$texture_worst) 
+texture_worst.test
+
+#Perimeter_worst
+cat("Mean perimeter_worst for benign", mean(benign$perimeter_worst), "\n")
+
+cat("Std for perimeter_worst for benign", sd(benign$perimeter_worst), "\n")
+
+cat("Mean perimeter_worst for malignant", mean(malignant$perimeter_worst), "\n")
+
+cat("Std for perimeter_worst for malignant", sd(malignant$perimeter_worst), "\n")
+
+perimeter_worst.test <- t.test(benign$perimeter_worst, malignant$perimeter_worst) 
+perimeter_worst.test
+
+#Area_worst
+cat("Mean area_worst for benign", mean(benign$area_worst), "\n")
+
+cat("Std for area_worst for benign", sd(benign$area_worst), "\n")
+
+cat("Mean area_worst for malignant", mean(malignant$area_worst), "\n")
+
+cat("Std for area_worst for malignant", sd(malignant$area_worst), "\n")
+
+area_worst.test <- t.test(benign$area_worst, malignant$area_worst) 
+area_worst.test
+
+#Smoothness_worst
+cat("Mean smoothness_worst for benign", mean(benign$smoothness_worst), "\n")
+
+cat("Std for smoothness_worst for benign", sd(benign$smoothness_worst), "\n")
+
+cat("Mean smoothness_worst for malignant", mean(malignant$smoothness_worst), "\n")
+
+cat("Std for smoothness_worst for malignant", sd(malignant$smoothness_worst), "\n")
+
+smoothness_worst.test <- t.test(benign$smoothness_worst, malignant$smoothness_worst) 
+smoothness_worst.test
+
+#Compactness_worst
+cat("Mean compactness_worst for benign", mean(benign$compactness_worst), "\n")
+
+cat("Std for compactness_worst for benign", sd(benign$compactness_worst), "\n")
+
+cat("Mean compactness_worst for malignant", mean(malignant$compactness_worst), "\n")
+
+cat("Std for compactness_worst for malignant", sd(malignant$compactness_worst), "\n")
+
+compactness_worst.test <- t.test(benign$compactness_worst, malignant$compactness_worst) 
+compactness_worst.test
+
+#Concavity_worst
+cat("Mean concavity_worst for benign", mean(benign$concavity_worst), "\n")
+
+cat("Std for concavity_worst for benign", sd(benign$concavity_worst), "\n")
+
+cat("Mean concavity_worst for malignant", mean(malignant$concavity_worst), "\n")
+
+cat("Std for concavity_worst for malignant", sd(malignant$concavity_worst), "\n")
+
+concavity_worst.test <- t.test(benign$concavity_worst, malignant$concavity_worst) 
+concavity_worst.test
+
+#concave.points_worst
+cat("Mean concave.points_worst for benign", mean(benign$concave.points_worst), "\n")
+
+cat("Std for concave.points_worst for benign", sd(benign$concave.points_worst), "\n")
+
+cat("Mean concave.points_worst for malignant", mean(malignant$concave.points_worst), "\n")
+
+cat("Std for concave.points_worst for malignant", sd(malignant$concave.points_worst), "\n")
+
+concave.points_worst.test <- t.test(benign$concave.points_worst, malignant$concave.points_worst) 
+concave.points_worst.test
+
+#symmetry_worst
+cat("Mean symmetry_worst for benign", mean(benign$symmetry_worst), "\n")
+
+cat("Std for symmetry_worst for benign", sd(benign$symmetry_worst), "\n")
+
+cat("Mean symmetry_worst for malignant", mean(malignant$symmetry_worst), "\n")
+
+cat("Std for symmetry_worst for malignant", sd(malignant$symmetry_worst), "\n")
+
+symmetry_worst.test <- t.test(benign$symmetry_worst, malignant$symmetry_worst) 
+symmetry_worst.test
+
+#Fractal_dimension_worst 
+cat("Mean fractal_dimension_worst for benign", mean(benign$fractal_dimension_worst), "\n")
+
+cat("Std for fractal_dimension_worst for benign", sd(benign$fractal_dimension_worst), "\n")
+
+cat("Mean fractal_dimension_worst for malignant", mean(malignant$fractal_dimension_worst), "\n")
+
+cat("Std for fractal_dimension_worst for malignant", sd(malignant$fractal_dimension_worst), "\n")
+
+fractal_dimension_worst.test <- t.test(benign$fractal_dimension_worst, malignant$fractal_dimension_worst) 
+fractal_dimension_worst.test
+
+```
+
+```
+
+
