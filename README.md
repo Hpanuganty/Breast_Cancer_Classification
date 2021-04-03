@@ -22,4 +22,4 @@ and 32 variables:
 10. Fractal Dimension: Pattern changes depending on scale measured in
 
 ### Methodology
-Employed two predictive models: logistic regression (baseline) and neural networks. We produced 4 logistic regression models and 4 neural network models testing the different classes: All variables, Mean Variables, Worst variables + SE variables. Additionally, we plotted a variable importance plot to identify which variable (out of the 32) was most effective in determining the malignancy or benignity of the tumor.
+Employed two predictive models in R: logistic regression (baseline) and neural networks. We produced 4 logistic regression models and 4 neural network models testing the different classes: All variables, Mean Variables, Worst variables + SE variables. Additionally, we plotted a variable importance plot to identify which variable (out of the 32) was most effective in determining the malignancy or benignity of the tumor.
