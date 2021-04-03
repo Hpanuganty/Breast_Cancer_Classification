@@ -8,7 +8,7 @@ Breast cancer is the second leading cause of cancer death in women, with over 25
 The goal of this project is to _determine whether a breast mass tumor is malignant or benign based on several different physical factors._
 
 ### Classes and Variables 
-This dataset consists of 3 classes: - means, standard error (SE) and worst (i.e., mean of three largest values in each variable) 
+This dataset consists of 3 classes: means, standard error (SE) and worst (i.e., mean of three largest values in each variable) 
 and 32 variables: 
 1. Radius: Distance from center to points on perimeter 
 2. Texture: Standard deviation of gray-scale values 
