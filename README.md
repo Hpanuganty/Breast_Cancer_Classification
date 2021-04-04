@@ -1,5 +1,5 @@
 # Breast_Cancer_Classification
-### Utilized logistic regression and neural network models to classify breast cancer tumors as malignant or benign based on digitized biopsy images 
+### Logistic regression and neural network models to classify breast cancer tumors as malignant or benign based on digitized biopsy images 
 
 This dataset is publicly available on [Kaggle](https://www.kaggle.com/uciml/breast-cancer-wisconsin-data) and looks at the physical features of a breast mass from digitized images from a file needle aspirate biopsy.
 
